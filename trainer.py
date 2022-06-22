@@ -3,7 +3,8 @@ import numpy as np
 from utils.stats_manager import StatsManager
 from utils.data_logs import save_logs_train, save_logs_eval
 import os
-
+import csv
+import matplotlib.pyplot as plt
 
 class Trainer:
     def __init__(self, network, train_dataloader, eval_dataloader, criterion, optimizer, lr_scheduler, config):
@@ -142,6 +143,16 @@ class Trainer:
 
         running_loss = 0.0
         self.network.eval()
+        
+        # Added
+        path_to_save = os.path.join(self.config['exp_path'], self.config['exp_name'])
+        csvfile = open(os.path.join(path_to_save, 'results.csv'), 'w')
+        output_writer = csv.writer(csvfile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+        output_writer.writerow(['index', 'original_depth', 'pred_depth', 'original_distance', 'pred_distance',
+                                'original_magnitude', 'pred_magnitude', 'error', 'eval_loss'])
+        csvfile.flush()
+        out_index = 0
+
         for idx, (inputs, labels_depth, labels_distance, labels_magnitude) in enumerate(test_dataloader, 0):
             inputs = inputs.to(self.config['device']).float()
             labels_depth = labels_depth.to(self.config['device']).float()
@@ -162,6 +173,16 @@ class Trainer:
             stats_lbl_depth.append(labels_depth.detach().cpu().numpy())
             stats_lbl_distance.append(labels_distance.detach().cpu().numpy())
             stats_lbl_magnitude.append(labels_magnitude.detach().cpu().numpy())
+            
+            # Added
+            for i in range(len(stats_lbl_depth[-1])):
+                output_writer.writerow([out_index, stats_lbl_depth[-1][i]*10.0, stats_pred_depth[-1][i]*10.0,
+                                        stats_lbl_distance[-1][i]*10.0, stats_pred_distance[-1][i]*10.0,
+                                        stats_lbl_magnitude[-1][i]*10.0, stats_pred_magnitude[-1][i]*10.0,
+                                        round((stats_pred_magnitude[-1][i] - stats_lbl_magnitude[-1][i])*10.0, 2),
+                                        eval_loss.item()])
+                csvfile.flush()
+                out_index += 1
 
         mean_depth_err, mean_distance_err, mean_magnitude_err = \
             self.stats_manager.get_stats(pred_depth=stats_pred_depth, pred_distance=stats_pred_distance,
@@ -177,3 +198,15 @@ class Trainer:
         history = open(os.path.join(self.config['exp_path'], self.config['exp_name'], '__testStats__.txt'), "a")
         history.write(stats_description)
         history.close()
+        
+        # Added
+        lbl = np.concatenate(stats_lbl_magnitude).ravel()*10.0
+        pred = np.concatenate(stats_pred_magnitude).ravel()*10.0
+
+        fig4, ax = plt.subplots()
+        ax.scatter(lbl, pred, alpha=0.4, facecolors='none', edgecolors='b')
+        ax.plot([lbl.min(), lbl.max()], [pred.min(), pred.max()], 'k--', alpha=0.4, lw=2)
+        ax.set_xlabel('Measured')
+        ax.set_ylabel('Predicted')
+        fig4.savefig(os.path.join(path_to_save, 'plots5.png'))
+

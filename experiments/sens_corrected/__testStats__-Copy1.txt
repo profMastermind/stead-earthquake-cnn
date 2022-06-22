@@ -1,0 +1,1 @@
+### Test loss = 0.49974921070186, mean DEPTH error = 3.5317389965057373,                               mean DISTANCE error = 2.5670225620269775, mean MAGNITUDE error = 0.16830603778362274

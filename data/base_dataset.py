@@ -10,11 +10,18 @@ class BaseDataset(torch.utils.data.Dataset):
     def __init__(self, config):
         self.config = config
         self.information = pd.read_csv(self.config['train_csv_path'])
-        self.sensor_data = h5py.File(self.config['train_data_path'], 'r', driver='core')
-        self.eq_event_names = self.information[self.information.trace_category == 'earthquake_local']['trace_name'].to_list()
+        self.sensor_data = h5py.File(self.config['train_data_path'], 'r') # Modified: remove driver='core'
+        # Modified
+        # self.eq_event_names = self.information[self.information.trace_category == 'earthquake_local']['trace_name'].to_list()
+        # Added senstivity
+        self.sens_file = './sensetivity_total_292k_mod.csv'
+        self.sensitivity = pd.read_csv(self.sens_file, index_col='event_id')
+        self.eq_event_names = list(self.sensor_data['data'].keys())
 
     def __getitem__(self, index):
-        eq_raw_data = np.array(self.sensor_data['earthquake']['local'][self.eq_event_names[index]])
+        # Modified
+        sens = np.array([self.sensitivity.loc[self.eq_event_names[index]].values[k]/1.0E6 for k in (2, 4, 6)])
+        eq_raw_data = np.array(self.sensor_data['data'][self.eq_event_names[index]]) / sens
         info = self.information[self.information.trace_name == self.eq_event_names[index]]
 
         # Compute input for NN
